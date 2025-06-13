@@ -245,7 +245,7 @@ const resources = {
       "appDescription": "Este sistema auxilia no gerenciamento e checagem dos equipamentos da empresa, garantindo que tudo esteja em ordem.",
       "searchPlaceholder": "Buscar equipamento por nome, tipo ou local...",
       "add": "Adicionar Novo",
-      "report": "Gerar Relatório",
+      "report": "Gerar Check List",
       "total": "Total",
       "checked": "Checado",
       "functioning": "Funcionando",
