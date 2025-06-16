@@ -18,18 +18,30 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
 
 const PREDEFINED_LOCATIONS = [
-  'Fábrica Jaboatão', 
-  'Fábrica Raposo', 
-  'Fábrica Mogi das Cruzes', 
-  'CV João Pessoa', 
-  'CV Caruaru', 
-  'Brasília', 
-  'Jaguariúna', 
-  'Osasco', 
+   'Fábrica Jaboatão',
+  'Fábrica Raposo',
+  'Fábrica Mogi das Cruzes',
   'Fábrica Rio de Janeiro',
-  'Juiz de Fora',
-  'Pouso Alegre',
-  'Gravataí'
+  'Fabrica Jaguariúna',
+  'Fabrica Osasco',
+  'Fabrica Juiz de Fora',
+  'Fabrica Pouso Alegre',
+  'QSR Jaguaré',
+  'Fabrica Inhauma',
+  'Fabrica Gravataí',
+  'CV João Pessoa',
+  'CV Igarassu',
+  'CV Natal',
+  'CV Guaralhos',
+  'CV Santo André',
+  'CV Sorocaba',
+  'CV São Pedro da Aldeia',
+  'CV Campo Grande',
+  'CV São Gonçalo',
+  'CV Mega Rio',
+  'CV Caruaru',
+  'CV Brasília',
+  'CV Anhanguera',
 ];
 
 const COMPANY_LOGO_URL = ""; 
