@@ -9,7 +9,7 @@ import 'jspdf-autotable';
 import { format, parseISO, startOfDay, endOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
-const ReportModal = ({ isOpen, onClose, equipments, locations, logoUrl, logoPlaceholder, bimboLogoUrl }) => {
+const ReportModal = ({ isOpen, onClose, equipments, locations }) => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [selectedLocation, setSelectedLocation] = useState('all');
@@ -21,7 +21,6 @@ const ReportModal = ({ isOpen, onClose, equipments, locations, logoUrl, logoPlac
     const pageWidth = doc.internal.pageSize.width;
     const marginLeft = 15;
 
-    // Adiciona logos
     try {
       doc.addImage('/images/Logo.png', 'PNG', 10, 10, 30, 22.5);
       doc.addImage('https://i.postimg.cc/L5xbDjPQ/logo-1.png', 'PNG', pageWidth - 40, 10, 30, 22.5);
@@ -29,7 +28,6 @@ const ReportModal = ({ isOpen, onClose, equipments, locations, logoUrl, logoPlac
       console.error('Erro ao adicionar logos:', error);
     }
 
-    // Título principal
     currentY = 30;
     doc.setFont(undefined, 'bold');
     doc.setFontSize(14);
@@ -38,7 +36,6 @@ const ReportModal = ({ isOpen, onClose, equipments, locations, logoUrl, logoPlac
     doc.setFontSize(10);
     currentY += 15;
 
-    // Data de geração (rótulo em negrito)
     const generationDate = format(new Date(), 'dd/MM/yyyy HH:mm', { locale: ptBR });
     doc.setFont(undefined, 'bold');
     doc.text('Data de geração: ', marginLeft, currentY);
@@ -46,7 +43,6 @@ const ReportModal = ({ isOpen, onClose, equipments, locations, logoUrl, logoPlac
     doc.text(generationDate, marginLeft + doc.getTextWidth('Data de geração: '), currentY);
     currentY += 7;
 
-    // Filtros (formato específico solicitado)
     let filterInfo = [];
     if (startDate) filterInfo.push(format(parseISO(startDate), 'dd/MM/yyyy', { locale: ptBR }));
     if (endDate) filterInfo.push(`Até: ${format(parseISO(endDate), 'dd/MM/yyyy', { locale: ptBR })}`);
@@ -54,71 +50,62 @@ const ReportModal = ({ isOpen, onClose, equipments, locations, logoUrl, logoPlac
 
     if (filterInfo.length > 0) {
       doc.setFont(undefined, 'bold');
-      doc.text('Filtros : ', marginLeft, currentY); // Espaço após "Filtros" como solicitado
+      doc.text('Filtros : ', marginLeft, currentY);
       doc.setFont(undefined, 'normal');
-      
+
       let xPos = marginLeft + doc.getTextWidth('Filtros : ');
-      
       filterInfo.forEach((filter, index) => {
-        // Verifica se é o primeiro item (data sem rótulo)
         if (index === 0 && startDate) {
           doc.text(filter, xPos, currentY);
           xPos += doc.getTextWidth(filter);
         } else {
-          // Para os demais itens (com rótulos)
           const [label, ...valueParts] = filter.split(':');
           const value = valueParts.join(':').trim();
-          
+
           if (label) {
             doc.setFont(undefined, 'bold');
             doc.text(`${label}:`, xPos, currentY);
             xPos += doc.getTextWidth(`${label}:`);
-            
             doc.setFont(undefined, 'normal');
-            doc.text(` ${value}`, xPos, currentY); // Espaço após os :
+            doc.text(` ${value}`, xPos, currentY);
             xPos += doc.getTextWidth(` ${value}`);
           }
         }
-        
+
         if (index < filterInfo.length - 1) {
           doc.text(' | ', xPos, currentY);
           xPos += doc.getTextWidth(' | ');
         }
       });
-      
+
       currentY += 10;
     } else {
       currentY += 3;
     }
 
-    // Filtra equipamentos
-    let filteredEquipments = equipments;
+    const filteredEquipments = equipments.filter(equipment => {
+      const startDateObj = startDate ? startOfDay(parseISO(startDate)) : null;
+      const endDateObj = endDate ? endOfDay(parseISO(endDate)) : null;
 
-    if (startDate) {
-      const start = startOfDay(parseISO(startDate));
-      filteredEquipments = filteredEquipments.filter(eq => parseISO(eq.lastCheck) >= start);
-    }
-    if (endDate) {
-      const end = endOfDay(parseISO(endDate));
-      filteredEquipments = filteredEquipments.filter(eq => parseISO(eq.lastCheck) <= end);
-    }
-    if (selectedLocation !== 'all') {
-      filteredEquipments = filteredEquipments.filter(eq => eq.location === selectedLocation);
-    }
+      const matchesDate = (!startDateObj || (equipment.lastCheck && parseISO(equipment.lastCheck) >= startDateObj)) &&
+                          (!endDateObj || (equipment.lastCheck && parseISO(equipment.lastCheck) <= endDateObj));
 
-    // Prepara dados da tabela
+      const matchesLocation = selectedLocation === 'all' || equipment.location === selectedLocation;
+
+      return matchesDate && matchesLocation;
+    });
+
     const tableData = filteredEquipments.map(eq => ([
       eq.name,
       eq.type || '-',
       eq.status,
       eq.location,
-      format(parseISO(eq.lastCheck), 'dd/MM/yyyy HH:mm', { locale: ptBR }),
-      'Sim',
+      eq.lastCheck ? format(parseISO(eq.lastCheck), 'dd/MM/yyyy HH:mm', { locale: ptBR }) : '-',
+      'Sim', // Always show "Sim" for the "Verificado" column
       eq.notes || '-',
-      (eq.photos && eq.photos.length > 0) ? 'Foto(s) incluída(s)' : 'Sem foto'
+      eq.photo || (eq.photos?.length > 0) ? 'Com foto' : 'Sem foto'
     ]));
 
-    // Adiciona tabela
     doc.autoTable({
       startY: currentY,
       head: [['Nome', 'Tipo', 'Status', 'Localidade', 'Última Verificação', 'Verificado', 'Observações', 'Foto']],
@@ -144,9 +131,13 @@ const ReportModal = ({ isOpen, onClose, equipments, locations, logoUrl, logoPlac
 
     currentY = doc.previousAutoTable.finalY + 10;
 
-    // Adiciona fotos dos equipamentos
+    // Adiciona fotos
     for (const eq of filteredEquipments) {
-      if (eq.photos && eq.photos.length > 0) {
+      const photoSources = [];
+      if (eq.photo) photoSources.push(eq.photo);
+      if (eq.photos && Array.isArray(eq.photos)) photoSources.push(...eq.photos);
+
+      if (photoSources.length > 0) {
         if (currentY + 15 + 45 > pageHeight - 10) {
           doc.addPage();
           currentY = 20;
@@ -154,7 +145,7 @@ const ReportModal = ({ isOpen, onClose, equipments, locations, logoUrl, logoPlac
 
         doc.setFontSize(10);
         doc.setTextColor(50, 50, 50);
-        doc.text(`Fotos de: ${eq.name} (${eq.location})`, 15, currentY);
+        doc.text(`Fotos de: ${eq.name} (${eq.type || '-'} - ${eq.location})`, 15, currentY);
         currentY += 7;
 
         let photoX = 15;
@@ -162,7 +153,7 @@ const ReportModal = ({ isOpen, onClose, equipments, locations, logoUrl, logoPlac
         const photoSpacing = 5;
         const maxPhotosPerRow = Math.floor((pageWidth - 30) / (photoHeight + photoSpacing));
 
-        for (let i = 0; i < eq.photos.length; i++) {
+        for (let i = 0; i < photoSources.length; i++) {
           if (photoX + photoHeight > pageWidth - 15 || (i > 0 && i % maxPhotosPerRow === 0)) {
             photoX = 15;
             currentY += photoHeight + photoSpacing;
@@ -173,21 +164,31 @@ const ReportModal = ({ isOpen, onClose, equipments, locations, logoUrl, logoPlac
           }
 
           try {
-            const photoData = eq.photos[i];
-            doc.addImage(photoData, 'PNG', photoX, currentY, photoHeight, photoHeight);
+            const photoDataUrl = photoSources[i];
+            console.log('Tentando adicionar foto com Data URL:', photoDataUrl ? photoDataUrl.substring(0, 50) + '...' : 'undefined'); // Log do início do Data URL
+            const match = /^data:image\/(png|jpeg);base64,/.exec(photoDataUrl);
+            if (match) {
+              const imageType = match[1].toUpperCase();
+              doc.addImage(photoDataUrl, imageType, photoX, currentY, photoHeight, photoHeight);
+            } else {
+              doc.setFontSize(8);
+              doc.setTextColor(255, 0, 0);
+              doc.text('Foto inválida', photoX, currentY + photoHeight / 2);
+            }
           } catch (error) {
             console.error(`Erro ao carregar foto do equipamento ${eq.name}:`, error);
             doc.setFontSize(8);
             doc.setTextColor(255, 0, 0);
             doc.text('Foto inválida', photoX, currentY + photoHeight / 2);
           }
+
           photoX += photoHeight + photoSpacing;
         }
+
         currentY += photoHeight + 10;
       }
     }
 
-    // Salva o PDF
     doc.save(`CHECK LIST_${format(new Date(), 'yyyyMMdd_HHmm')}.pdf`);
     toast({
       title: 'PDF gerado com sucesso!',

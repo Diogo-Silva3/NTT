@@ -140,6 +140,14 @@ function App() {
           <Toaster />
         </Suspense>
       </div>
+      <motion.footer
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.5, duration: 0.5 }}
+        className="py-6 text-center text-sm text-company-text-secondary bg-company-background"
+      >
+        © 2025 BIMBO. Todos os direitos reservados.<br/>Desenvolvido por Diogo Silva
+      </motion.footer>
     </AuthProvider>
   );
 }

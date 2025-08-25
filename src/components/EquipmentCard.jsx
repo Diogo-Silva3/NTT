@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { Camera, Trash2, Eye, Calendar, MapPin } from 'lucide-react';
+import { Camera, Trash2, Eye, Calendar, MapPin, Edit, Check } from 'lucide-react';
 import { motion } from 'framer-motion';
 import DeleteConfirmDialog from '@/components/DeleteConfirmDialog';
 
@@ -12,9 +12,9 @@ const EquipmentCard = ({
   onToggleCheck, 
   onDelete, 
   onTakePhoto, 
-  onViewPhoto 
+  onViewPhoto,
+  onDeletePhoto
 }) => {
-  const [isHovered, setIsHovered] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const getStatusColor = (status) => {
@@ -44,6 +44,7 @@ const EquipmentCard = ({
     return icons[type] || '💻';
   };
 
+
   const handleDelete = () => {
     setShowDeleteConfirm(false);
     onDelete(equipment.id);
@@ -63,11 +64,12 @@ const EquipmentCard = ({
         <CardHeader className="pb-3">
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3">
-              <div className="text-2xl">{getTypeIcon(equipment.type)}</div>
+ <div className="text-2xl">{getTypeIcon(equipment.type)}</div>
               <div>
-                <CardTitle className="text-lg text-white group-hover:text-green-400 transition-colors">
+ <CardTitle className="text-lg text-white group-hover:text-green-400 transition-colors flex items-center gap-2">
                   {equipment.name}
-                </CardTitle>
+ </CardTitle>
+
                 <div className="flex items-center gap-2 mt-1">
                   <Badge variant="outline" className={getStatusColor(equipment.status)}>
                     {equipment.status}
@@ -75,7 +77,7 @@ const EquipmentCard = ({
                   <span className="text-sm text-gray-400">{equipment.type}</span>
                 </div>
               </div>
-            </div>
+ </div>
             
             <Checkbox
               checked={equipment.checked}
@@ -106,6 +108,7 @@ const EquipmentCard = ({
             </p>
           )}
 
+
           {/* Seção para exibir múltiplas fotos */}
           {equipment.photos && equipment.photos.length > 0 && (
             <div className="flex overflow-x-auto gap-2 pb-2">
@@ -114,8 +117,9 @@ const EquipmentCard = ({
                   <img
                     src={photoUrl}
                     alt={`Foto de ${equipment.name} ${index + 1}`}
-                    className="w-32 h-32 object-cover rounded-lg border border-green-500/20"
-                  />
+                    className="max-w-full h-auto"
+                    onError={(e) => console.error('Failed to load image:', e.target.src)}
+                  /> 
                   <Button
                     onClick={() => onViewPhoto(equipment.id, index)} // Pass equipment id and photo index
                     variant="ghost"
@@ -134,7 +138,7 @@ const EquipmentCard = ({
           <motion.div 
             className="flex gap-2 pt-2"
             initial={{ opacity: 0 }}
-            animate={{ opacity: isHovered ? 1 : 0.7 }}
+            animate={{ opacity: 1 }}
             transition={{ duration: 0.2 }}
           >
             <Button

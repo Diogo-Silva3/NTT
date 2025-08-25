@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import EquipmentCard from '@/components/EquipmentCard';
@@ -7,8 +7,8 @@ import AddEquipmentForm from '@/components/AddEquipmentForm';
 import CameraCapture from '@/components/CameraCapture';
 import PhotoViewer from '@/components/PhotoViewer';
 import ReportModal from '@/components/ReportModal';
-import { 
-  Plus, 
+import {
+  Plus,
   Search,
   FileDown
 } from 'lucide-react';
@@ -17,61 +17,121 @@ import { toast } from '@/components/ui/use-toast';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
 
-// Predefined locations for equipment
+import jsPDF from 'jspdf'; // Importar jsPDF
 const PREDEFINED_LOCATIONS = [
-  'Fábrica Jaboatão', 
-  'Fábrica Raposo', 
-  'Fábrica Mogi das Cruzes', 
-  'Jaguariúna', 
-  'Osasco', 
+   'Fábrica Jaboatão',
+  'Fábrica Raposo',
+  'Fábrica Mogi das Cruzes',
   'Fábrica Rio de Janeiro',
-  'Juiz de Fora',
-  'Pouso Alegre',
-  'Gravataí',
-  'CV Igarassu',
+  'Fabrica Jaguariúna',
+  'Fabrica Osasco',
+  'Fabrica Juiz de Fora',
+  'Fabrica Pouso Alegre',
+  'QSR Jaguaré',
+  'Fabrica Inhauma',
+  'Fabrica Gravataí',
   'CV João Pessoa',
+  'CV Igarassu',
   'CV Natal',
-  'CV Guarulhos',
+  'CV Guaralhos',
   'CV Santo André',
   'CV Sorocaba',
-  'CV São Pedro de Aldeia',
-  'CV Brasilia',
+  'CV São Pedro da Aldeia',
+  'CV Campo Grande',
   'CV São Gonçalo',
   'CV Mega Rio',
-  'CV Valinhos',
-  'CV Anhanguera'
+  'CV Caruaru',
+  'CV Brasília',
+  'CV Anhanguera',
 ];
-// Company logo URL (ensure this path is correct relative to your project's public directory)
-const COMPANY_LOGO_URL = "public/images/Logo.png";
-// Placeholder text for the company logo if the URL is not set (fetched from translations)
-const LOGO_PLACEHOLDER_TEXT = 'NTT DATA'; 
 
-const ChecklistPage = () => { 
+const COMPANY_LOGO_URL = "";
+
+// >>> Função de teste básico para adicionar imagem estática <<<
+function testAddImageSimple() {
+  const doc = new jsPDF();
+
+  // Data URL de um pequeno quadrado vermelho (exemplo de imagem base64 simples)
+  // Você pode substituir por outro Data URL de uma imagem pequena e conhecida se tiver um.
+  const testImageUrl = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/wcAAwAB/epJ33AAAAAASUVORK5CYII=';
+
+  try {
+    console.log("--- Iniciando Teste de Imagem Estática ---");
+    console.log("Tentando adicionar imagem estática de teste...");
+    // Adiciona o quadrado vermelho no canto superior esquerdo do PDF
+    doc.addImage(testImageUrl, 'PNG', 10, 10, 20, 20); // addImage(imageData, format, x, y, width, height)
+    doc.save('teste_imagem_simples.pdf');
+    console.log("Teste de imagem estática concluído: PDF 'teste_imagem_simples.pdf' gerado.");
+    console.log("--- Fim Teste de Imagem Estática ---");
+  } catch (error) {
+    console.error("--- Erro no Teste de Imagem Estática ---");
+    console.error("Teste de imagem estática: Erro ao adicionar imagem:", error);
+    console.error("Detalhes do erro do teste estático:", error);
+    console.log("--- Fim Erro no Teste de Imagem Estática ---");
+  }
+}
+const ChecklistPage = () => {
+  const PHOTO_SIZES = {
+    'Pequeno': { width: 400, height: 300 },
+    'Médio': { width: 800, height: 600 },
+    'Grande': { width: 1200, height: 900 },
+  };
+
+
+  // Function to resize base64 image using Canvas
+  const resizeImage = (base64String, maxWidth, maxHeight) => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+
+        // Calculate new dimensions maintaining aspect ratio
+        if (width > maxWidth) {
+          height *= maxWidth / width;
+          width = maxWidth;
+        }
+        if (height > maxHeight) { // Check height limit after width adjustment
+          width *= maxHeight / height;
+          height = maxHeight;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', 0.7)); // Get resized base64 (JPEG with 70% quality)
+      };
+      img.onerror = reject;
+      img.src = base64String;
+    });
+  };
+
   const { t } = useTranslation();
-  // Get the current authenticated user
-  const { user } = useAuth(); 
+  const { user } = useAuth();
   const LOGO_PLACEHOLDER_TEXT = t('logoPlaceholder');
 
   const [equipments, setEquipments] = useState([]);
-  console.log('Equipments state:', equipments);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterType, setFilterType] = useState('all');
-  // State for filtering by location
   const [filterLocation, setFilterLocation] = useState('all');
   const [showAddForm, setShowAddForm] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
   const [currentEquipmentId, setCurrentEquipmentId] = useState(null);
   const [showPhotoViewer, setShowPhotoViewer] = useState(false);
+  const [selectedPhotoSize, setSelectedPhotoSize] = useState('Médio'); // State for selected size
   const [currentPhoto, setCurrentPhoto] = useState(null);
   const [logoUrl, setLogoUrl] = useState(COMPANY_LOGO_URL);
-  const { i18n } = useTranslation(); // Access i18n instance for language change
 
   useEffect(() => {
     const savedEquipments = localStorage.getItem('equipments');
     if (savedEquipments) {
-      setEquipments(JSON.parse(savedEquipments));
+      const loadedEquipments = JSON.parse(savedEquipments); // Carrega todos os dados, incluindo a foto se existir
+      setEquipments(loadedEquipments);
+      console.log('Equipments loaded from localStorage:', loadedEquipments);
     } else {
       const sampleData = [
         {
@@ -83,8 +143,7 @@ const ChecklistPage = () => {
           notes: 'Instalada em 2023, funcionando perfeitamente',
           checked: false,
           lastCheck: new Date().toISOString(),
-          photos: [], // Initialize photos as an empty array
-          userId: 'tech001' 
+          userId: 'tech001'
         },
         {
           id: 2,
@@ -95,77 +154,42 @@ const ChecklistPage = () => {
           notes: 'Necessita atualização de firmware',
           checked: true,
           lastCheck: new Date(Date.now() - 86400000).toISOString(),
-          photos: [], // Initialize photos as an empty array
           userId: 'admin001'
         }
       ];
       setEquipments(sampleData);
+      // Salva os dados de exemplo no localStorage, incluindo a propriedade 'photo' se presente
       localStorage.setItem('equipments', JSON.stringify(sampleData));
     }
 
     if (COMPANY_LOGO_URL && COMPANY_LOGO_URL !== "YOUR_LOGO_URL_HERE") {
       setLogoUrl(COMPANY_LOGO_URL);
     }
+
+    // >>> FIM CHAMADA DE TESTE <<<
   }, []);
 
   useEffect(() => {
+    // Salva o estado atual dos equipamentos no localStorage, incluindo a propriedade 'photo'
     localStorage.setItem('equipments', JSON.stringify(equipments));
+    console.log('Equipments saved:', equipments);
   }, [equipments]);
 
-  // Function to add a new equipment item
+  // Remove the updateEquipmentName function as part of reverting name editing changes
+  // const updateEquipmentName = (id, newName) => {
+  //   setEquipments(prev =>
+  //     prev.map(eq =>
+  //       eq.id === id ? { ...eq, name: newName } : eq
+  //     )
+  //   );
+  // };
+
   const addEquipment = (newEquipment) => {
-    setEquipments(prev => [...prev, { 
-      ...newEquipment, 
-      userId: user?.id, 
-      id: Date.now(),
-      photos: [] // Ensure new equipment also has a photos array
-    }]); //Ensure unique ID
+    setEquipments(prev => [...prev, { ...newEquipment, userId: user?.id, id: Date.now() }]); //Ensure unique ID
   };
 
-  const toggleEquipmentCheck = (id) => {
-    // Toggle the 'checked' status and update the 'lastCheck' timestamp
-    setEquipments(prev => 
-      prev.map(eq => 
-        eq.id === id 
-          ? { ...eq, checked: !eq.checked, lastCheck: new Date().toISOString() }
-          : eq
-      )
-    );
-  };
-
-  // Function to dynamically import Bimbo logo based on i18n language or other criteria if needed
-  const getBimboLogoUrl = () => {
-    // For now, hardcoding the path. If different logos are needed for different languages,
-    // this function can be updated to check the current language and return the appropriate path.
-    return "public/public/images/BimboLogo.png"; 
-  };
-
-  // State to hold the Bimbo logo URL
-  const [bimboLogoUrl, setBimboLogoUrl] = useState('');
-
-  useEffect(() => {
-    // Set the Bimbo logo URL when the component mounts
-    setBimboLogoUrl(getBimboLogoUrl());
-  }, []);
-
-  // Function to change the application language
-  const changeLanguage = (lng) => {
-    i18n.changeLanguage(lng);
-  };
-
-  // This is the header component with logos, title and language selector
-  // Original structure before responsive design attempt
-  const AppHeader = () => (
-    <header className="flex flex-col md:flex-row justify-between items-center mb-8">
-      {/* Container for Language Selector and Bimbo Logo */}
-    </header>
-  );
-
-  // Function to delete an equipment item
   const deleteEquipment = (id) => {
-    // Filter out the equipment with the given ID
     setEquipments(prev => prev.filter(eq => eq.id !== id));
-    // Show a toast notification indicating the equipment was removed
     toast({
       title: t('equipmentRemoved'),
       description: t('equipmentRemovedDesc'),
@@ -173,66 +197,101 @@ const ChecklistPage = () => {
   };
 
   const openCamera = (equipmentId) => {
-    // Set the ID of the equipment for which the photo is being taken
     setCurrentEquipmentId(equipmentId);
     setShowCamera(true);
   };
 
-  // Handler for when a photo is captured
-  // This function now receives an array of photo Data URLs
-  const handlePhotoCapture = (newPhotos) => {
+  // Recebe a string Base64 da foto diretamente do CameraCapture
+  const handlePhotoCapture = async (photoDataUrls) => { // Expect an array of photo data URLs
     if (currentEquipmentId) {
-      setEquipments(prev =>
-        prev.map(eq =>
-          eq.id === currentEquipmentId
-            ? { ...eq, photos: [...eq.photos, ...newPhotos] } // Append new photos to existing ones
-            : eq
-        )
-      );
+      // Get dimensions based on selectedPhotoSize
+      const dimensions = PHOTO_SIZES[selectedPhotoSize] || PHOTO_SIZES['Médio']; // Default to Médio if not found
+
+      try {
+        const resizedPhotos = await Promise.all(photoDataUrls.map(async (photoDataUrl) => {
+           console.log('Processing photo, original data URL:', photoDataUrl ? photoDataUrl.substring(0, 50) + '...' : 'null'); // Log first 50 chars
+           return await resizeImage(photoDataUrl, dimensions.width, dimensions.height); // Resize each photo
+        }));
+
+        setEquipments(prev =>
+          prev.map(eq =>
+            eq.id === currentEquipmentId
+              ? { ...eq, photos: eq.photos ? [...eq.photos, ...resizedPhotos] : [...resizedPhotos] } // Add resized photos to 'photos' array
+              : eq
+          )
+        );
+        toast({ title: t('photoSaved'), description: t('photoSavedDesc') }); // Add success toast
+      } catch (error) {
+        console.error("Error resizing or saving photo:", error);
+        toast({ title: t('errorSavingPhoto'), description: t('errorProcessingImage'), variant: "destructive" });
+
+      }
+
     }
     setShowCamera(false);
-    setCurrentEquipmentId(null);
-    // Note: Clearing capturedPhotos state is handled within CameraCapture component
+    setCurrentEquipmentId(null); // Reset currentEquipmentId
   };
-  // Function to view a captured photo
+
   const viewPhoto = (photo) => {
     setCurrentPhoto(photo);
     setShowPhotoViewer(true);
   };
-
-  // Filter equipments based on search term and selected filters
+  
+  const handleDeletePhoto = (equipmentId, photoIndex) => {
+    setEquipments(prev =>
+      prev.map(eq => {
+        if (eq.id === equipmentId && eq.photos) {
+          const newPhotos = eq.photos.filter((_, index) => index !== photoIndex);
+          return { ...eq, photos: newPhotos };
+        }
+        return eq;
+      })
+    );
+    toast({ title: t('photoRemoved'), description: t('photoRemovedDesc') });
+  };
 
   const filteredEquipments = equipments.filter(equipment => {
     const nameMatch = equipment.name?.toLowerCase().includes(searchTerm.toLowerCase());
     const typeMatch = equipment.type?.toLowerCase().includes(searchTerm.toLowerCase());
     const locationMatch = equipment.location?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesSearch = nameMatch || typeMatch || locationMatch;
-    
+
     const matchesStatus = filterStatus === 'all' || equipment.status === filterStatus;
     const matchesType = filterType === 'all' || equipment.type === filterType;
     const matchesLocation = filterLocation === 'all' || equipment.location === filterLocation;
-    
+
     return matchesSearch && matchesStatus && matchesType && matchesLocation;
   });
+  
+  // Sort filtered equipments by lastCheck or id (most recent first)
+  const sortedEquipments = filteredEquipments.sort((a, b) => {
+    const dateA = a.lastCheck ? new Date(a.lastCheck).getTime() : a.id;
+    const dateB = b.lastCheck ? new Date(b.lastCheck).getTime() : b.id;
+    // Sort in descending order (most recent first)
+    return dateB - dateA;
+  });
 
-  // Calculate statistics based on the current equipment list
 
-  console.log('Filtered Equipments:', filteredEquipments);
   const stats = {
     total: equipments.length,
-    checked: equipments.filter(eq => eq.checked).length,
     functioning: equipments.filter(eq => eq.status === 'funcionando').length,
     maintenance: equipments.filter(eq => eq.status === 'manutencao').length,
     broken: equipments.filter(eq => eq.status === 'defeito').length
   };
 
-  // Get unique equipment types and locations for filter dropdowns
   const uniqueTypes = [...new Set(equipments.map(eq => eq.type).filter(Boolean))];
   const uniqueLocations = [...new Set(equipments.map(eq => eq.location).filter(Boolean))];
 
   return (
     <div className="max-w-7xl mx-auto">
-      <AppHeader />
+      <motion.p
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.2, duration: 0.5 }}
+        className="text-md text-company-text-secondary text-center mb-10 max-w-3xl mx-auto"
+      >
+        {t('appDescription')} {user && <span className="font-semibold">{t('welcomeUser', {name: user.name})}</span>}
+      </motion.p>
 
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -242,7 +301,6 @@ const ChecklistPage = () => {
       >
         {[
           { labelKey: 'total', value: stats.total, color: 'text-company-brand-accent' },
-          { labelKey: 'checked', value: stats.checked, color: 'text-green-500' },
           { labelKey: 'functioning', value: stats.functioning, color: 'text-green-500' },
           { labelKey: 'maintenance', value: stats.maintenance, color: 'text-yellow-500' },
           { labelKey: 'broken', value: stats.broken, color: 'text-red-500' },
@@ -256,7 +314,6 @@ const ChecklistPage = () => {
         ))}
       </motion.div>
 
-      {/* Search, filter, and add equipment section */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -266,7 +323,6 @@ const ChecklistPage = () => {
         <Card className="bg-company-card-bg border-company-border">
           <CardContent className="p-6">
             <div className="flex flex-col md:flex-row gap-4 items-center">
-              {/* Search input */}
               <div className="relative flex-1 w-full md:w-auto">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-company-text-secondary h-4 w-4" />
                 <Input
@@ -276,7 +332,7 @@ const ChecklistPage = () => {
                   className="pl-10 bg-company-input-bg border-company-border text-company-text-primary placeholder:text-company-text-secondary w-full focus:ring-company-brand focus:border-company-brand"
                 />
               </div>
-              {/* Filter dropdowns and action buttons */}
+
               <div className="flex gap-2 flex-wrap justify-center md:justify-start">
                 <select
                   value={filterStatus}
@@ -287,17 +343,6 @@ const ChecklistPage = () => {
                   <option value="funcionando">{t('functioning')}</option>
                   <option value="manutencao">{t('maintenance')}</option>
                   <option value="defeito">{t('broken')}</option>
-                </select>
-                
-                <select
-                  value={filterType}
-                  onChange={(e) => setFilterType(e.target.value)}
-                  className="px-3 py-2 bg-company-input-bg border-company-border rounded-md text-company-text-primary text-sm focus:ring-company-brand focus:border-company-brand"
-                >
-                  <option value="all">{t('allTypes')}</option>
-                  {uniqueTypes.map(type => (
-                    <option key={type} value={type}>{type}</option>
-                  ))}
                 </select>
 
                 <select
@@ -314,7 +359,18 @@ const ChecklistPage = () => {
                   ))}
                 </select>
                 
-                {/* Button to add new equipment */}
+                 {/* Photo Size Selector */}
+                 <select
+                  value={selectedPhotoSize}
+                  onChange={(e) => setSelectedPhotoSize(e.target.value)}
+                  className="px-3 py-2 bg-company-input-bg border-company-border rounded-md text-company-text-primary text-sm focus:ring-company-brand focus:border-company-brand"
+                >
+                  {Object.keys(PHOTO_SIZES).map(size => (
+                    <option key={size} value={size}>{t(`Tamanho foto.${size.toLowerCase()}`)}</option> // Use translation key
+                  ))}
+                </select>
+
+
                 <Button
                   onClick={() => setShowAddForm(true)}
                   className="bg-company-brand text-company-brand-foreground hover:bg-company-brand/90"
@@ -323,7 +379,6 @@ const ChecklistPage = () => {
                   {t('add')}
                 </Button>
 
-                {/* Button to open the report modal */}
                 <Button
                   onClick={() => setShowReportModal(true)}
                   variant="outline"
@@ -338,7 +393,6 @@ const ChecklistPage = () => {
         </Card>
       </motion.div>
 
-      {/* Equipment cards section */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -350,17 +404,16 @@ const ChecklistPage = () => {
             <EquipmentCard
               key={equipment.id}
               equipment={equipment}
-              onToggleCheck={toggleEquipmentCheck}
               onDelete={deleteEquipment}
               onTakePhoto={openCamera}
               onViewPhoto={viewPhoto}
-              photos={equipment.photos} // Pass the photos array to EquipmentCard
+              onDeletePhoto={handleDeletePhoto} // Pass the new handler
+              // Remove onSaveName prop as part of reverting name editing changes
             />
           ))}
         </AnimatePresence>
       </motion.div>
 
-      {/* Message shown when no equipment is found */}
       {filteredEquipments.length === 0 && (
         <motion.div
           initial={{ opacity: 0 }}
@@ -387,7 +440,6 @@ const ChecklistPage = () => {
         </motion.div>
       )}
 
-      {/* Modals and forms */}
       <AddEquipmentForm
         isOpen={showAddForm}
         onClose={() => setShowAddForm(false)}
@@ -395,7 +447,6 @@ const ChecklistPage = () => {
         locations={PREDEFINED_LOCATIONS}
       />
 
-      {/* Camera capture modal */}
       <CameraCapture
         isOpen={showCamera}
         onClose={() => {
@@ -405,7 +456,6 @@ const ChecklistPage = () => {
         onPhotoCapture={handlePhotoCapture}
       />
 
-      {/* Photo viewer modal */}
       <PhotoViewer
         photo={currentPhoto}
         isOpen={showPhotoViewer}
@@ -415,15 +465,13 @@ const ChecklistPage = () => {
         }}
       />
 
-      {/* Report generation modal */}
       <ReportModal
         isOpen={showReportModal}
         onClose={() => setShowReportModal(false)}
-        equipments={equipments}
+        equipments={equipments} // Passa o estado local com as fotos
         locations={PREDEFINED_LOCATIONS}
         logoUrl={logoUrl}
         logoPlaceholder={LOGO_PLACEHOLDER_TEXT}
- bimboLogoUrl={bimboLogoUrl}
       />
     </div>
   );

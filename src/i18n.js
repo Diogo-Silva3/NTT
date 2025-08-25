@@ -364,7 +364,10 @@ const resources = {
       "locationSaoGoncalo": "CV São Gonçalo",
       "locationMegaRio": "CV Mega Rio",
       "locationValinhos": "CV Valinhos",
-      "locationAnhanguera": "CV Anhanguera"
+      "locationAnhanguera": "CV Anhanguera",
+      "Tamanho foto.pequeno": "Pequeno",
+ "Tamanho foto.médio": "Médio",
+ "Tamanho foto.grande": "Grande",
     }
   }
 };
